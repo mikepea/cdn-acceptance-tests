@@ -147,6 +147,9 @@ func TestHelpersCDNBackendServerRandomPort(t *testing.T) {
 // CDNBackendServer should use TLS by default as evidenced by an HTTPS URL
 // from `httptest.Server`.
 func TestHelpersCDNBackendServerTLSEnabled(t *testing.T) {
+	if ! *enableTLSBackends {
+		t.Skip("TLS Backend tests disabled")
+	}
 	const expectedURLPrefix = "https://"
 
 	backend := CDNBackendServer{
@@ -169,6 +172,9 @@ func TestHelpersCDNBackendServerTLSEnabled(t *testing.T) {
 // CDNBackendServer should use a self-signed certificate from
 // `httptest.Server` if `TLSCerts` is empty (default).
 func TestHelpersCDNBackendServerTLSDefaultCert(t *testing.T) {
+	if ! *enableTLSBackends {
+		t.Skip("TLS Backend tests disabled")
+	}
 	expectedCertDNSNames := []string{"example.com"}
 	expectedCertIPAddresses := []net.IP{
 		net.IPv4(127, 0, 0, 1).To4(),

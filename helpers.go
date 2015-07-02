@@ -94,9 +94,11 @@ func (s *CDNBackendServer) Start() {
 		s.server.TLS = &tls.Config{
 			Certificates: s.TLSCerts,
 		}
+		s.server.StartTLS()
+	} else {
+		s.server.Start()
 	}
 
-	s.server.StartTLS()
 	log.Printf("Started server on port %d", s.Port)
 }
 

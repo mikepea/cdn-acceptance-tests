@@ -19,6 +19,8 @@ var (
 	originPort    = flag.Int("originPort", 8080, "Origin port to listen on for requests")
 	skipFailover  = flag.Bool("skipFailover", false, "Skip failover tests and only setup the origin backend")
 	skipVerifyTLS = flag.Bool("skipVerifyTLS", false, "Skip TLS cert verification if set")
+	enableTLSBackends = flag.Bool("enableTLSBackends", true, "Start TLS on the backends")
+	enableTLSFrontend = flag.Bool("enableTLSFrontend", true, "Use TLS when connecting to the frontend")
 	usage         = flag.Bool("usage", false, "Print usage")
 	vendor        = flag.String("vendor", "", "Name of vendor; run tests specific to vendor")
 	// This only works with tests that use RoundTripCheckError(), that either
@@ -76,10 +78,17 @@ func init() {
 	if *skipVerifyTLS {
 		tlsOptions.InsecureSkipVerify = true
 	}
-	client = &http.Transport{
-		ResponseHeaderTimeout: requestTimeout,
-		TLSClientConfig:       tlsOptions,
-		Dial:                  NewCachedDial(*edgeHost),
+	if *enableTLSFrontend {
+		client = &http.Transport{
+			ResponseHeaderTimeout: requestTimeout,
+			TLSClientConfig:       tlsOptions,
+			Dial:                  NewCachedDial(*edgeHost),
+		}
+	} else {
+		client = &http.Transport{
+			ResponseHeaderTimeout: requestTimeout,
+			Dial:                  NewCachedDial(*edgeHost),
+		}
 	}
 
 	var backendCerts []tls.Certificate
@@ -93,31 +102,57 @@ func init() {
 		}
 	}
 
-	originServer = &CDNBackendServer{
-		Name:     "origin",
-		Port:     *originPort,
-		TLSCerts: backendCerts,
-	}
-	backendsByPriority = []*CDNBackendServer{
-		originServer,
-	}
+	if *enableTLSBackends {
+		originServer = &CDNBackendServer{
+			Name:     "origin",
+			Port:     *originPort,
+			TLSCerts: backendCerts,
+		}
+		backendsByPriority = []*CDNBackendServer{
+			originServer,
+		}
 
-	if !*skipFailover {
-		backupServer1 = &CDNBackendServer{
-			Name:     "backup1",
-			Port:     *backupPort1,
-			TLSCerts: backendCerts,
+		if !*skipFailover {
+			backupServer1 = &CDNBackendServer{
+				Name:     "backup1",
+				Port:     *backupPort1,
+				TLSCerts: backendCerts,
+			}
+			backupServer2 = &CDNBackendServer{
+				Name:     "backup2",
+				Port:     *backupPort2,
+				TLSCerts: backendCerts,
+			}
+			backendsByPriority = append(
+				backendsByPriority,
+				backupServer1,
+				backupServer2,
+			)
 		}
-		backupServer2 = &CDNBackendServer{
-			Name:     "backup2",
-			Port:     *backupPort2,
-			TLSCerts: backendCerts,
+	} else {
+		originServer = &CDNBackendServer{
+			Name:     "origin",
+			Port:     *originPort,
 		}
-		backendsByPriority = append(
-			backendsByPriority,
-			backupServer1,
-			backupServer2,
-		)
+		backendsByPriority = []*CDNBackendServer{
+			originServer,
+		}
+
+		if !*skipFailover {
+			backupServer1 = &CDNBackendServer{
+				Name:     "backup1",
+				Port:     *backupPort1,
+			}
+			backupServer2 = &CDNBackendServer{
+				Name:     "backup2",
+				Port:     *backupPort2,
+			}
+			backendsByPriority = append(
+				backendsByPriority,
+				backupServer1,
+				backupServer2,
+			)
+		}
 	}
 
 	log.Println("Confirming that CDN is healthy")
